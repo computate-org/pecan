@@ -39,6 +39,7 @@ option_list = list(optparse::make_option("--start.date",
                                          type="character")
                    )
 args <- optparse::parse_args(optparse::OptionParser(option_list = option_list))
+
 #args$start.date = "2022-05-18 00:00:00"
 #args$prev = "/projectnb/dietzelab/dietze/hf_landscape_SDA/test02/FOF2022-05-17/"
 
@@ -52,9 +53,12 @@ end.date <- start.date + lubridate::days(35)
 #------------------------------------------------------------------------------------------------
 restart <- list()
 restart$filepath <- args$prev
-set = readRDS(args$settings)
-projectdir = set$outdir
+set = PEcAn.settings::read.settings(args$settings)
+projectdir = Sys.getenv("PROJECT_DIR")
+set$outdir = projectdir
 
+##change the model binary file
+set$model$binary <- "/opt/app-root/src/forecast_example/model/sipnet"
 # --------------------------------------------------------------------------------------------------
 #---------------------------------------------- NA DATA -------------------------------------
 # --------------------------------------------------------------------------------------------------
@@ -72,7 +76,7 @@ NAdata = data.frame(date = c(rep(format(start.date, "%Y-%m-%d %H:%M:%S", tz = "G
                     site_id = rep(site.ids,times=2),
                     data = rep(NA,nsite*2))
 obs.mean <- obs.cov <- split(NAdata, NAdata$date)
-date.obs <- names(obs.mean)
+date.obs <- as.Date(names(obs.mean))
 obs.mean <- purrr::map(
   names(obs.mean),
   function(namesl){
@@ -103,7 +107,6 @@ obs.cov <- purrr::map(
 restart$start.cut <- as_datetime(start.date)
 restart$start.cut <- format(restart$start.cut, "%Y-%m-%d %H:%M:%S", tz = "GMT")
 
-
 #-----------------------------------------------------------------------------------------------
 #------------------------------------------ Fixing the settings --------------------------------
 #-----------------------------------------------------------------------------------------------
@@ -113,7 +116,7 @@ for(s in seq_along(set)){
   set[[s]]$run$end.date   = end.date
   set[[s]]$run$site$met.start = prev.date  ## time period for t == 1, prev forecast
   set[[s]]$run$site$met.end   = start.date   
-}
+}                                   
 
 # Setting dates in assimilation tags - This will help with preprocess split in SDA code
 set$state.data.assimilation$start.date <-as.character(start.date)
@@ -143,7 +146,7 @@ dir.create(set$modeloutdir,showWarnings = FALSE)
 dir.create(set$pfts$pft$outdir,showWarnings = FALSE)
 
 #manually add in clim files 
-path = "/projectnb/dietzelab/ahelgeso/NOAA_met_data_CH1/noaa_clim/HARV/" ## hack
+path = "/opt/app-root/src/forecast_example/GEFS/" ## hack
 met_paths <- list.files(path = file.path(path, start.date), full.names = TRUE, pattern = ".clim")
 #met_paths <- list.files(path = file.path(settings$run$settings.1$inputs$met$path, start.date), full.names = TRUE, pattern = ".clim")
 if(purrr::is_empty(met_paths)){
@@ -200,7 +203,7 @@ sda.enkf.multisite(settings = set,
                                   pause = FALSE,
                                   Profiling = FALSE,
                                   OutlierDetection=FALSE,
-                                  free_run = FALSE))  ## seems to be defined twice
+                                  free_run = TRUE))  ## seems to be defined twice
 
 
 

@@ -83,79 +83,17 @@ for (s in seq_along(runDays)) {
         msg = system2(file.path(pecan_home,"modules/assim.sequential/inst/hf_landscape/05_SDA_Workflow_NA.R"),
                       paste("--start.date",runDays[s],
                             "--prev",prev,
-                            "--settings",file.path(projectdir,"pecan.RDS")),
+                            "--settings",file.path(pecan_home,"modules/assim.sequential/inst/hf_landscape/pecan.xml")),
                       wait=TRUE,
                       stdout="stdout.log",
                       stderr="stderr.log")
         print(msg)
-        
       }
     } else { break }
   } else {
     ## previous run didn't occur
     break
   }
-  
-  ##########################################
-  ##  Ensure Sipnet.out files are merged  ##
-  ##########################################
-  this.out = dir(file.path(now,"out"),full.names = TRUE)
-  for(i in seq_along(this.out)){
-    #this.out[i] = "/projectnb/dietzelab/dietze/hf_landscape_SDA/test03/tmp"
-    ### testing specific hack ###
-    foo = dir(this.out[i],pattern = "foo.nc",full.names = TRUE)
-    unlink(foo)
-    ## get files
-    ncf = dir(this.out[i],pattern = "*.nc$",full.names = TRUE)
-    out = dir(this.out[i],pattern = "*.out$",full.names = TRUE)
-    ## CASE 1: files weren't merged properly
-    if(length(out)>1 & length(ncf) > 0 ){ 
-      ## grab sipnet output
-      raw = list()
-      for(j in seq_along(out)){
-        raw[[j]] = read.delim(out[j], header = T, skip = 1, sep = "")
-        #if(length(out) > 1 & j == 1) raw[[j]][["day"]] = raw[[j]][["day"]] - 1 ## one-time testing hack
-      }
-      raw = dplyr::bind_rows(raw)
-      tvals <- raw[["day"]] + raw[["time"]] / 24
-      tdate = tvals + raw[["year"]]*1000 ## composite value for sorting, not a correct datetime
-      raw = raw[order(tdate),]
-      y = min(raw[["year"]])
-      dates <- PEcAn.SIPNET::sipnet2datetime(tvals,base_year = y)
-      ## grab netcdf
-      nc = ncdf4::nc_open(ncf)
-      ndates = ncdf4::ncvar_get(nc,varid = "time")
-      ncdf4::nc_close(nc)
-      if(min(tvals) == min(ndates) & max(tvals) == max(ndates)) next   ## check if date range matches
-      ## if not, clean up and try again
-      unlink(out)
-      unlink(ncf)
-      write.table("header",file=out[length(out)],col.names = F,row.names = F)
-      write.table(raw,file=out[length(out)],col.names = TRUE,row.names = FALSE,append = TRUE)
-      #out2 = read.delim(out[length(out)], header = T, skip = 1, sep = "") ## check that things match
-      PEcAn.SIPNET::model2netcdf.SIPNET(outdir = this.out[i],
-                                      sitelat=set[[1]]$run$site$lat,   ## works for HF but need to generalize this hard coding to match site
-                                      sitelon=set[[1]]$run$site$lat,
-                                      start_date = min(dates),
-                                      end_date   = max(dates),
-                                      revision   = "ssr"
-                                      )
-    } else {
-      ## CASE 1: single output, not converted
-      if(length(out) == 1 & length(ncf) == 0){
-        PEcAn.SIPNET::model2netcdf.SIPNET(outdir = this.out[i],
-                                          sitelat=set[[1]]$run$site$lat,   ## works for HF but need to generalize this hard coding to match site
-                                          sitelon=set[[1]]$run$site$lat,
-                                          start_date = runDays[s],
-                                          end_date   = as.Date(runDays[s]) + lubridate::days(35),
-                                          revision   = "ssr",
-                                          delete.raw = FALSE,
-                                          conflict   = TRUE
-                                          )
-      }
-    }
-  } ## end loop over files
-
 } ## end loop over dates
 
 
