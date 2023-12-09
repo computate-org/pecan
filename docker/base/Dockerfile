@@ -1,7 +1,8 @@
 # this needs to be at the top, what version are we building
 ARG IMAGE_VERSION="latest"
+ARG FROM_ORG="pecan"
 ARG FROM_IMAGE="depends"
-FROM pecan/${FROM_IMAGE}:${IMAGE_VERSION}
+FROM ${FROM_ORG}/${FROM_IMAGE}:${IMAGE_VERSION}
 MAINTAINER Rob Kooper <kooper@illinois.edu>
 
 # ----------------------------------------------------------------------

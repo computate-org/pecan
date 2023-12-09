@@ -1,27 +1,32 @@
 # this needs to be at the top, what version are we building
 ARG IMAGE_VERSION="latest"
+ARG FROM_ORG="pecan"
+ARG FROM_IMAGE="base"
 
 # ----------------------------------------------------------------------
 # BUILD SIPNET BINARY
 # ----------------------------------------------------------------------
-FROM pecan/models:${IMAGE_VERSION} as model-binary
+FROM ${FROM_ORG}/${FROM_IMAGE}:${IMAGE_VERSION} as model-binary
 
 # Some variables that can be used to set control the docker build
 ARG MODEL_VERSION=git
+ARG GITHUB_ORG="PecanProject"
+ARG GITHUB_REPO="sipnet"
 
 # download, unzip and build sipnet
 WORKDIR /src
-RUN git clone https://github.com/PecanProject/sipnet.git \
+RUN echo "https://github.com/${GITHUB_ORG}/${GITHUB_REPO}.git"
+RUN git clone "https://github.com/${GITHUB_ORG}/${GITHUB_REPO}.git" \
     && cd sipnet \
     && if [ "${MODEL_VERSION}" != "git" ]; then git checkout ${MODEL_VERSION}; fi \
-    && make
+    && env LDLAGS=-lm make
 
 ########################################################################
 
 # ----------------------------------------------------------------------
 # BUILD PECAN FOR SIPNET
 # ----------------------------------------------------------------------
-FROM pecan/models:${IMAGE_VERSION}
+FROM ${FROM_ORG}/${FROM_IMAGE}:${IMAGE_VERSION}
 
 # ----------------------------------------------------------------------
 # INSTALL SIPNET SPECIFIC PIECES
