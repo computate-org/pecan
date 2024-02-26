@@ -1,4 +1,4 @@
-#!/usr/bin/env Rscript
+#!/usr/bin/env Rscript#!/usr/bin/env Rscript
 #load libraries
 # pecan_home example: /pecan
 pecan_home <- Sys.getenv("PECAN_HOME")
@@ -19,12 +19,18 @@ option_list = list(optparse::make_option("--start.date",
     optparse::make_option("--jumpback.date",
         type="character")
 )
+# initialize future map parallelization.
+if (future::supportsMulticore()) {
+    future::plan(future::multicore)
+  } else {
+    future::plan(future::multisession)
+  }
 args <- optparse::parse_args(optparse::OptionParser(option_list = option_list))
 startdate <- as.Date(args$start.date)
-if(!is.null(args$jumpback.date))
-  args$jumpback = as.numeric(startdate - as.Date(args$jumpback.date))
-if(is.null(args$jumpback))
-  args$jumpback = 10
+# if(!is.null(args$jumpback.date))
+#   args$jumpback = as.numeric(startdate - as.Date(args$jumpback.date))
+# if(is.null(args$jumpback))
+#   args$jumpback = 10
 jumpback = args$jumpback
 
 #set fcn inputs
@@ -33,11 +39,11 @@ site.lon = -72.15
 sitename <- "HARV"
 siteid <- 646
 runDays <- format(seq(from=as.POSIXlt(startdate) - lubridate::days(jumpback),
-        to=as.POSIXlt(as.character(startdate)),
+        to=as.POSIXlt(as.Date(args$jumpback.date)),
         by="days"),"%Y-%m-%d")
 print("args set")
 
-download_data <- function(runDays, t, sitename, site, nc_dir, clim_dir) {
+download_data <- function(runDays, t, sitename, nc_dir, clim_dir) {
   print(runDays[t])
   
   #download met using EFI fcns
@@ -77,29 +83,30 @@ download_data <- function(runDays, t, sitename, site, nc_dir, clim_dir) {
   print(paste0("Look for data in: ", outfolder))
 }
 
-for(t in seq_along(runDays)){
-  tryCatch({
-      tryCatch({
-          download_data(runDays, t, sitename, site, nc_dir, clim_dir)
-        }
-        , error = function(ex) {
-          if(!grepl("Path does not exist", toString(ex))) {
-            num_seconds <- 10
-            print(paste0("An error occured, will try again in ", num_seconds, " seconds: ", ex))
-            Sys.sleep(num_seconds)
-            download_data(runDays, t, sitename, site, nc_dir, clim_dir)
-          }
-        }
-      )
-    }
-    , error = function(ex) {
-      num_seconds <- 20
-      print(paste0("An error occured, will try again in ", num_seconds, " seconds: ", ex))
-      Sys.sleep(num_seconds)
-      download_data(runDays, t, sitename, site, nc_dir, clim_dir)
-    }
-  )
-  
+map_list <- vector("list", length(runDays))
+for (t in seq_along(runDays)) {
+    map_list[[t]] <- list(runDays = runDays[t],
+                         sitename = sitename,
+                         nc_dir = nc_dir,
+                         clim_dir = clim_dir)
 }
+map_list %>% furrr::future_map(function(ll) {
+   max_t <- 0
+    if (file.exists(file.path(ll$clim_dir, ll$sitename, ll$runDays))) {
+        return(1)
+    } else {
+        while("try-error" %in% class(
+        try(download_data(ll$runDays, 1, ll$sitename, ll$nc_dir, ll$clim_dir), silent = T))
+        ){
+        Sys.sleep(60)
+        max_t <- max_t + 1
+        if(max_t > 1e4){
+            PEcAn.logger::logger.info("Error too many times!")
+            break
+            return(0)
+            }
+        } 
+    }
+    gc()
+}, .progress = T)
 print("done")
-

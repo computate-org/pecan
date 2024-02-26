@@ -1,3 +1,4 @@
+
 #' download.NOAA_GEFS_EFI
 #'
 #' @param start_date start date for met forecast
@@ -15,6 +16,7 @@
 #' 
 download.NOAA_GEFS_EFI <- function(sitename, outfolder, start_date, site.lat, site.lon){
   #using the stage2 fcn mean that the met as already been downscaled and gapfilled to 1 hr intervals
+  PEcAn.logger::logger.info("outfolder: ", outfolder)
   met = PEcAn.data.atmosphere::noaa_stage2(cycle = 0, 
                     version = "v12", 
                     endpoint = "data.ecoforecast.org", 
